@@ -5,8 +5,6 @@
 </template>
 
 <script>
-	import headTop from '../components/headTop'
-	import dtime from 'time-formater'
 
     export default {
     	data(){
@@ -15,7 +13,6 @@
     		}
     	},
     	components: {
-    		headTop,
     	},
     	mounted(){
 

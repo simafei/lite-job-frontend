@@ -1,6 +1,20 @@
 <template>
     <div class="fillcontain">
-        <!--<head-top></head-top>-->
+        <el-row :gutter="20" class="table_container">
+            <el-col :span="6">服务名: <el-input placeholder="服务名" v-model="queryParams.appName" style="width: 60%"></el-input></el-col>
+            <el-col :span="12">时间区间:
+                <el-date-picker
+                    v-model="datePeriod"
+                    type="datetimerange"
+                    :picker-options="pickerOptions2"
+                    range-separator="至"
+                    start-placeholder="开始日期"
+                    end-placeholder="结束日期"
+                    align="right">
+                </el-date-picker></el-col>
+            <el-col :span="2"><el-button type="primary" round @click="search()">搜索</el-button></el-col>
+            <el-col :span="2"><el-button type="success" round @click="createDialogVisible = true">新建任务</el-button></el-col>
+        </el-row>
         <div class="table_container">
             <el-table
                 :data="tableData"
@@ -54,12 +68,16 @@
                     <template slot-scope="scope">
                         <el-button
                             size="small"
-                            @click="handleEdit(scope.row)">编辑
+                            @click="openStartDialog(scope.row)">启动
+                        </el-button>
+                        <el-button
+                            size="small"
+                            @click="pauseOrResumeJob(scope.row)">暂停
                         </el-button>
                         <el-button
                             size="small"
                             type="danger"
-                            @click="handleDelete(scope.$index, scope.row)">删除
+                            @click="deleteJob(scope.$index, scope.row)">删除
                         </el-button>
                     </template>
                 </el-table-column>
@@ -73,32 +91,81 @@
                 </el-pagination>
             </div>
         </div>
+
+        <el-dialog title="新建任务" :visible.sync="createDialogVisible">
+            <el-form>
+                <el-form-item label="活动名称">
+                    <el-input placeholder="任务名称" value=""></el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="createDialogVisible = false">取 消</el-button>
+                <el-button type="primary" @click="createDialogVisible = false">确 定</el-button>
+            </div>
+        </el-dialog>
+
+        <el-dialog title="运行任务" :visible.sync="startDialogVisible">
+            <el-form>
+                <el-form-item label="任务参数:">
+                    <el-input type="textarea" :rows=3 placeholder="任务参数" v-model="jobArgs"></el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button type="primary" @click="triggerJob()">运行一次</el-button>
+                <el-button type="primary" @click="startJob">启动任务</el-button>
+            </div>
+        </el-dialog>
     </div>
 </template>
 
 <script>
-    //import headTop from '../components/headTop'
-
     export default {
         data() {
             return {
-                offset: 0,
-                limit: 20,
+                pickerOptions2: {
+                    shortcuts: [{
+                        text: '最近一周',
+                        onClick(picker) {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+                            picker.$emit('pick', [start, end]);
+                        }
+                    }, {
+                        text: '最近一个月',
+                        onClick(picker) {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+                            picker.$emit('pick', [start, end]);
+                        }
+                    }, {
+                        text: '最近三个月',
+                        onClick(picker) {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
+                            picker.$emit('pick', [start, end]);
+                        }
+                    }]
+                },
+                createDialogVisible: false,
+                startDialogVisible: false,
                 count: 0,
                 totalPage: 0,
-                queryParams:{},
+                datePeriod: [],
+                queryParams: {},
                 tableData: [],
+                jobArgs: "",
                 currentPage: 1,
-                expendRow: []
+                chooseRow: {}
             }
         },
         mounted() {
             this.initData();
         },
         computed: {},
-        components: {
-            //headTop,
-        },
+        components: {},
         methods: {
             initData() {
                 try {
@@ -110,7 +177,7 @@
             getJobList() {
                 this.$http.get('/jobs', {params: this.queryParams}).then(function (response) {
                     this.tableData = response.body.items;
-                    this.queryParams.page = response.body.currentPage;
+                    this.queryParams.currentPage = response.body.currentPage;
                     this.currentPage = response.body.currentPage;
                     this.totalPage = response.body.totalPage;
                     this.count = response.body.totalCount;
@@ -118,13 +185,50 @@
                     console.log(error);
                 });
             },
-            tableRowClassName(row, index) {
-                if (index === 1) {
-                    return 'info-row';
-                } else if (index === 3) {
-                    return 'positive-row';
+            search() {
+                if (this.datePeriod.length > 0) {
+                    this.queryParams.startTime = this.datePeriod[0].getTime();
+                    this.queryParams.endTime = this.datePeriod[1].getTime();
                 }
-                return '';
+                console.log(this.queryParams);
+                this.getJobList();
+            },
+            openStartDialog(row){
+                console.log(row);
+                this.chooseRow = row;
+                this.startDialogVisible=true;
+            },
+            startJob() {
+                this.startDialogVisible=false;
+                this.$http.post('/jobs/start', this.createJobParams(this.jobArgs)).then(function (response) {
+                    this.$message('任务启动成功');
+                }, function (error) {
+                    console.log(error);
+                });
+            },
+            createJobParams(jobHandler, appName, args) {
+                return {"key": {"jobHandler": jobHandler, "appName": appName}, "args": args};
+            },
+            createJobParams(args) {
+                return {"key": {"jobHandler": this.chooseRow.jobHandler, "appName": this.chooseRow.appName}, "args": args};
+            },
+            pauseOrResumeJob(row) {
+                console.log(this.tableData[row]);
+            },
+            triggerJob() {
+                this.startDialogVisible=false;
+                this.$http.post('/jobs/triggers', this.createJobParams(this.jobArgs)).then(function (response) {
+                    this.$message('任务触发成功');
+                }, function (error) {
+                    console.log(error);
+                });
+            },
+            deleteJob(index, row) {
+                this.$http.delete('/jobs', {params: {"jobHandler":row.jobHandler, "appName": row.appName}}).then(function (response) {
+                    this.tableData.splice(index, 1)
+                }, function (error) {
+                    console.log(error);
+                });
             },
         },
     }
