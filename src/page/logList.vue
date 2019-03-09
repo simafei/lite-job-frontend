@@ -1,129 +1,147 @@
 <template>
     <div class="fillcontain">
-        <head-top></head-top>
+        <el-row :gutter="20" class="table_container">
+            <el-col :span="5">服务名: <el-input placeholder="服务名" v-model="queryParams.appName" style="width: 60%"></el-input></el-col>
+            <el-col :span="5">执行器: <el-input placeholder="执行器" v-model="queryParams.jobHandler" style="width: 60%"></el-input></el-col>
+            <el-col :span="12">创建时间:
+                <el-date-picker
+                    v-model="datePeriod"
+                    type="datetimerange"
+                    :picker-options="pickerOptions2"
+                    range-separator="至"
+                    start-placeholder="开始日期"
+                    end-placeholder="结束日期"
+                    align="right">
+                </el-date-picker></el-col>
+            <el-col :span="2"><el-button type="primary" round @click="search()">搜索</el-button></el-col>
+        </el-row>
         <div class="table_container">
             <el-table
                 :data="tableData"
                 style="width: 100%">
-                <el-table-column type="expand">
-                  <template slot-scope="props">
-                    <el-form label-position="left" inline class="demo-table-expand">
-                      <el-form-item label="店铺名称">
-                        <span>{{ props.row.name }}</span>
-                      </el-form-item>
-                      <el-form-item label="店铺地址">
-                        <span>{{ props.row.address }}</span>
-                      </el-form-item>
-                      <el-form-item label="店铺介绍">
-                        <span>{{ props.row.description }}</span>
-                      </el-form-item>
-                      <el-form-item label="店铺 ID">
-                        <span>{{ props.row.id }}</span>
-                      </el-form-item>
-                      <el-form-item label="联系电话">
-                        <span>{{ props.row.phone }}</span>
-                      </el-form-item>
-                      <el-form-item label="评分">
-                        <span>{{ props.row.rating }}</span>
-                      </el-form-item>
-                      <el-form-item label="销售量">
-                        <span>{{ props.row.recent_order_num }}</span>
-                      </el-form-item>
-                      <el-form-item label="分类">
-                        <span>{{ props.row.category }}</span>
-                      </el-form-item>
-                    </el-form>
-                  </template>
+                <el-table-column
+                  label="服务名"
+                  prop="appName">
                 </el-table-column>
                 <el-table-column
-                  label="店铺名称"
-                  prop="name">
+                  label="任务执行器"
+                  prop="jobHandler">
                 </el-table-column>
                 <el-table-column
-                  label="店铺地址"
-                  prop="address">
+                  label="运行参数"
+                  prop="jobArgs">
                 </el-table-column>
                 <el-table-column
-                  label="店铺介绍"
-                  prop="description">
+                    label="触发时间"
+                    prop="triggerTime">
                 </el-table-column>
-                <el-table-column label="操作" width="200">
-                  <template slot-scope="scope">
-                    <el-button
-                      size="mini"
-                      @click="handleEdit(scope.$index, scope.row)">编辑</el-button>
-                    <el-button
-                      size="mini"
-                      type="Success"
-                      @click="addFood(scope.$index, scope.row)">添加食品</el-button>
-                    <el-button
-                      size="mini"
-                      type="danger"
-                      @click="handleDelete(scope.$index, scope.row)">删除</el-button>
-                  </template>
+                <el-table-column
+                    label="触发结果"
+                    prop="triggerCode">
+                </el-table-column>
+                <el-table-column
+                    label="触发信息">
+                    <el-button type="primary">查看</el-button>
+                </el-table-column>
+                <el-table-column
+                    label="运行地址"
+                    prop="handleAddress">
+                </el-table-column>
+                <el-table-column
+                    label="运行时间"
+                    prop="handleTime">
+                </el-table-column>
+                <el-table-column
+                    label="运行结果"
+                    prop="handleCode">
+                </el-table-column>
+                <el-table-column
+                    label="运行信息">
+                    <el-button type="primary">查看</el-button>
                 </el-table-column>
             </el-table>
             <div class="Pagination">
                 <el-pagination
-                  @size-change="handleSizeChange"
-                  @current-change="handleCurrentChange"
                   :current-page="currentPage"
                   :page-size="20"
                   layout="total, prev, pager, next"
                   :total="count">
                 </el-pagination>
             </div>
-            <el-dialog title="修改店铺信息" v-model="dialogFormVisible">
-                <el-form :model="selectTable">
-                    <el-form-item label="店铺名称" label-width="100px">
-                        <el-input v-model="selectTable.name" auto-complete="off"></el-input>
-                    </el-form-item>
-                    <el-form-item label="详细地址" label-width="100px">
-                        <el-autocomplete
-                          v-model="address.address"
-                          :fetch-suggestions="querySearchAsync"
-                          placeholder="请输入地址"
-                          style="width: 100%;"
-                          @select="addressSelect"
-                        ></el-autocomplete>
-                        <span>当前城市：{{city.name}}</span>
-                    </el-form-item>
-                    <el-form-item label="店铺介绍" label-width="100px">
-                        <el-input v-model="selectTable.description"></el-input>
-                    </el-form-item>
-                    <el-form-item label="联系电话" label-width="100px">
-                        <el-input v-model="selectTable.phone"></el-input>
-                    </el-form-item>
-                    <el-form-item label="店铺分类" label-width="100px">
-                        <el-cascader
-                          :options="categoryOptions"
-                          v-model="selectedCategory"
-                          change-on-select
-                        ></el-cascader>
-                    </el-form-item>
-                    <el-form-item label="商铺图片" label-width="100px">
-                        <el-upload
-                          class="avatar-uploader"
-                          :action="baseUrl + '/v1/addimg/shop'"
-                          :show-file-list="false"
-                          :on-success="handleServiceAvatarScucess"
-                          :before-upload="beforeAvatarUpload">
-                          <img v-if="selectTable.image_path" :src="baseImgPath + selectTable.image_path" class="avatar">
-                          <i v-else class="el-icon-plus avatar-uploader-icon"></i>
-                        </el-upload>
-                    </el-form-item>
-                </el-form>
-              <div slot="footer" class="dialog-footer">
-                <el-button @click="dialogFormVisible = false">取 消</el-button>
-                <el-button type="primary" @click="updateShop">确 定</el-button>
-              </div>
-            </el-dialog>
         </div>
     </div>
 </template>
 
 <script>
-
+    export default {
+        data() {
+            return {
+                pickerOptions2: {
+                    shortcuts: [{
+                        text: '最近一周',
+                        onClick(picker) {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+                            picker.$emit('pick', [start, end]);
+                        }
+                    }, {
+                        text: '最近一个月',
+                        onClick(picker) {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+                            picker.$emit('pick', [start, end]);
+                        }
+                    }, {
+                        text: '最近三个月',
+                        onClick(picker) {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
+                            picker.$emit('pick', [start, end]);
+                        }
+                    }]
+                },
+                count: 0,
+                totalPage: 0,
+                datePeriod: [],
+                queryParams: {},
+                tableData: [],
+                currentPage: 1
+            }
+        },
+        mounted() {
+            this.initData();
+        },
+        methods: {
+            initData() {
+                try {
+                    this.getJobLogList();
+                } catch (err) {
+                    console.log('获取数据失败', err);
+                }
+            },
+            search() {
+                if (this.datePeriod.length > 0) {
+                    this.queryParams.startTime = this.datePeriod[0].getTime();
+                    this.queryParams.endTime = this.datePeriod[1].getTime();
+                }
+                this.getJobLogList();
+            },
+            getJobLogList() {
+                this.$http.get('/job-logs', {params: this.queryParams}).then(function (response) {
+                    this.tableData = response.body.items;
+                    this.queryParams.currentPage = response.body.currentPage;
+                    this.currentPage = response.body.currentPage;
+                    this.totalPage = response.body.totalPage;
+                    this.count = response.body.totalCount;
+                }, function (error) {
+                    console.log(error);
+                });
+            },
+        }
+    }
 </script>
 
 <style lang="less">

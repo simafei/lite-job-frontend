@@ -2,7 +2,7 @@
     <div class="fillcontain">
         <el-row :gutter="20" class="table_container">
             <el-col :span="6">服务名: <el-input placeholder="服务名" v-model="queryParams.appName" style="width: 60%"></el-input></el-col>
-            <el-col :span="12">时间区间:
+            <el-col :span="12">创建时间:
                 <el-date-picker
                     v-model="datePeriod"
                     type="datetimerange"
@@ -67,12 +67,23 @@
                 <el-table-column label="操作" width="360">
                     <template slot-scope="scope">
                         <el-button
+                            type="success"
                             size="small"
                             @click="openStartDialog(scope.row)">启动
                         </el-button>
                         <el-button
+                            type="warning"
                             size="small"
-                            @click="pauseOrResumeJob(scope.row)">暂停
+                            v-if="scope.row.status=='NORMAL'"
+                            @click="pauseJob(scope.row)">
+                            暂停
+                        </el-button>
+                        <el-button
+                            type="warning"
+                            size="small"
+                            v-if="scope.row.status=='PAUSED'"
+                            @click="resumeJob(scope.row)">
+                            恢复
                         </el-button>
                         <el-button
                             size="small"
@@ -94,13 +105,54 @@
 
         <el-dialog title="新建任务" :visible.sync="createDialogVisible">
             <el-form>
-                <el-form-item label="活动名称">
-                    <el-input placeholder="任务名称" value=""></el-input>
+                <el-row :gutter="20">
+                    <el-col :span="12">
+                        <el-form-item label="任务名称">
+                            <el-input placeholder="任务名称" v-model="addJobParams.jobName"></el-input>
+                        </el-form-item></el-col>
+                    <el-col :span="12">
+                        <el-form-item label="服务名称">
+                            <el-input placeholder="appName" v-model="addJobParams.appName"></el-input>
+                        </el-form-item>
+                    </el-col>
+                </el-row>
+
+                <el-row :gutter="20">
+                    <el-col :span="12">
+                        <el-form-item label="任务处理器">
+                            <el-input placeholder="jobHandler" v-model="addJobParams.jobHandler"></el-input>
+                        </el-form-item>
+                    </el-col>
+                    <el-col :span="12">
+                        <el-form-item label="调度表达式">
+                            <el-input placeholder="Cron表达式" v-model="addJobParams.cronExpression"></el-input>
+                        </el-form-item>
+                    </el-col>
+                </el-row>
+
+                <el-row :gutter="20">
+                    <el-col :span="12">
+                        <el-form-item label="任务重新次数">
+                            <el-input placeholder="任务重新次数" v-model="addJobParams.failRetryCount"></el-input>
+                        </el-form-item>
+                    </el-col>
+                    <el-col :span="12">
+                        <el-form-item label="任务超时时间">
+                            <el-input placeholder="任务超时时间" v-model="addJobParams.timeout"></el-input>
+                        </el-form-item>
+                    </el-col>
+                </el-row>
+
+                <el-form-item label="任务描述">
+                    <el-input type="textarea" :rows="2" placeholder="任务描述" v-model="addJobParams.description"></el-input>
+                </el-form-item>
+                <el-form-item label="任务运行参数">
+                    <el-input type="textarea" :rows="2" placeholder="任务运行参数" v-model="addJobParams.jobArgs"></el-input>
                 </el-form-item>
             </el-form>
             <div slot="footer" class="dialog-footer">
                 <el-button @click="createDialogVisible = false">取 消</el-button>
-                <el-button type="primary" @click="createDialogVisible = false">确 定</el-button>
+                <el-button type="primary" @click="createJob()">确 定</el-button>
             </div>
         </el-dialog>
 
@@ -112,7 +164,7 @@
             </el-form>
             <div slot="footer" class="dialog-footer">
                 <el-button type="primary" @click="triggerJob()">运行一次</el-button>
-                <el-button type="primary" @click="startJob">启动任务</el-button>
+                <el-button type="primary" v-if="chooseRow.status=='NONE'" @click="startJob()">启动任务</el-button>
             </div>
         </el-dialog>
     </div>
@@ -158,7 +210,10 @@
                 tableData: [],
                 jobArgs: "",
                 currentPage: 1,
-                chooseRow: {}
+                chooseRow: {},
+                addJobParams: {
+                    cronExpression: "0 0/5 * * * ?"
+                }
             }
         },
         mounted() {
@@ -190,8 +245,17 @@
                     this.queryParams.startTime = this.datePeriod[0].getTime();
                     this.queryParams.endTime = this.datePeriod[1].getTime();
                 }
-                console.log(this.queryParams);
                 this.getJobList();
+            },
+            createJob() {
+                console.log(this.addJobParams);
+                this.createDialogVisible=false;
+                this.$http.post('/jobs', this.addJobParams).then(function (response) {
+                    this.$message('任务创建成功');
+                    this.getJobList();
+                }, function (error) {
+                    console.log(error);
+                });
             },
             openStartDialog(row){
                 console.log(row);
@@ -201,19 +265,33 @@
             startJob() {
                 this.startDialogVisible=false;
                 this.$http.post('/jobs/start', this.createJobParams(this.jobArgs)).then(function (response) {
+                    this.chooseRow.status="NORMAL";
                     this.$message('任务启动成功');
                 }, function (error) {
                     console.log(error);
                 });
             },
-            createJobParams(jobHandler, appName, args) {
-                return {"key": {"jobHandler": jobHandler, "appName": appName}, "args": args};
-            },
+            // createJobParams(jobHandler, appName, args) {
+            //     return {"key": {"jobHandler": jobHandler, "appName": appName}, "args": args};
+            // },
             createJobParams(args) {
                 return {"key": {"jobHandler": this.chooseRow.jobHandler, "appName": this.chooseRow.appName}, "args": args};
             },
-            pauseOrResumeJob(row) {
-                console.log(this.tableData[row]);
+            pauseJob(row) {
+                this.$http.post('/jobs/pause', {"jobHandler": row.jobHandler, "appName": row.appName}).then(function (response) {
+                    row.status="PAUSED";
+                    this.$message('任务已暂停');
+                }, function (error) {
+                    console.log(error);
+                });
+            },
+            resumeJob(row) {
+                this.$http.post('/jobs/resume', {"jobHandler": row.jobHandler, "appName": row.appName}).then(function (response) {
+                    row.status="NORMAL";
+                    this.$message('任务恢复成功');
+                }, function (error) {
+                    console.log(error);
+                });
             },
             triggerJob() {
                 this.startDialogVisible=false;
